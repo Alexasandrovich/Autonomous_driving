@@ -25,3 +25,6 @@ Array Memory Manager is a utility aimed at efficient dynamic memory allocation a
 
 5) Navigator
 fast and lightweight web renderer using svg
+
+6) Web plots
+Simple and lightweight web plotting using svg
