@@ -22,3 +22,6 @@ Title: Array Memory Manager - Dynamic Memory Allocation and Automatic Deallocati
 
 Description:
 Array Memory Manager is a utility aimed at efficient dynamic memory allocation and automatic deallocation in C++. It allows for dynamic memory allocation on the heap and provides automatic deallocation of the memory if the pointer is no longer in use. By using the Array Memory Manager, developers can avoid memory fragmentation issues and improve memory management in their applications.
+
+5) Navigator
+fast and lightweight web renderer using svg
