@@ -246,9 +246,9 @@ class RobotPlot(gui.Svg):
         direction_up = math.radians(270)
         self.draw_robot(centerX, centerY, direction_up)
 
-class ManeuverArrow(gui.VBox):
+class ManeuverSvg(gui.VBox):
     def __init__(self, width, height):
-        super(ManeuverArrow, self).__init__()
+        super(ManeuverSvg, self).__init__()
         self.width = width
         self.height = height
         self.arrow_svg = gui.Svg(width=self.width, height=self.height)  # Создаём отдельный SVG для стрелки
@@ -289,7 +289,7 @@ class ManeuverArrow(gui.VBox):
         self.distance_table.empty()
         self.distance_table.append_from_list([
             ['До манёвра:'],
-            [f'{distance_to_maneuver} м']
+            [f'{distance_to_maneuver:.2f} м']
         ])
 
     # Пример манёвра налево
@@ -317,6 +317,48 @@ class ManeuverArrow(gui.VBox):
             (mid_x - size / 2, mid_y),
             (mid_x + size, mid_y),
             (mid_x + size, mid_y + size)
+        ]
+
+        for point in points_arrow:
+            arrow.add_coord(point[0], point[1])
+
+        for point in points_up:
+            up_line.add_coord(point[0], point[1])
+
+        arrow.set_stroke(8, 'black')
+        arrow.set_fill('none')
+        up_line.set_stroke(8, 'black')
+        up_line.set_fill('none')
+        sign.append(arrow)
+        sign.append(up_line)
+
+        # Добавляем стрелку в SVG
+        self.arrow_svg.append(sign)
+
+    def draw_right_arrow(self):
+        # Окружение знака (рамка)
+        sign = gui.SvgGroup()
+        background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
+        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_stroke(2, 'black')  # Чёрная рамка
+        sign.append(background)
+
+        # Стрелка направо
+        arrow = gui.SvgPolyline()
+        up_line = gui.SvgPolyline()
+        mid_x = self.width / 2
+        mid_y = self.height / 2
+        size = min(self.width, self.height) / 2 - 20
+
+        points_arrow = [
+            (mid_x - size / 2, mid_y - size / 2),
+            (mid_x + size / 2, mid_y),
+            (mid_x - size / 2, mid_y + size / 2)
+        ]
+        points_up = [
+            (mid_x + size / 2, mid_y),
+            (mid_x - size, mid_y),
+            (mid_x - size, mid_y + size)
         ]
 
         for point in points_arrow:
@@ -526,6 +568,39 @@ class ManeuverArrow(gui.VBox):
         # Добавляем стрелку в SVG
         self.arrow_svg.append(sign)
 
+class ProgressBar(gui.VBox):
+    def __init__(self, width, height):
+        super(ProgressBar, self).__init__()
+        self.width = width
+        self.height = height
+
+        # Создаём рамку для отображения процента
+        self.progress_svg = gui.Svg(width=self.width, height=self.height)
+        self.progress_table = gui.Table(width='100%')
+
+        # Настраиваем таблицу для отображения текста
+        self.progress_table.append_from_list([['Пройденный маршрут']], fill_title=True)
+        self.progress_table.set_style({
+            'font-size': '24px',
+            'text-align': 'center',
+            'border': '2px solid black',
+            'margin-top': '10px',
+            'width': '100%',
+            'padding': '5px'
+        })
+
+        # Добавляем SVG и таблицу в контейнер
+        self.append(self.progress_svg)
+        self.append(self.progress_table)
+
+    def update_progress(self, progress_percentage):
+        # Обновляем текст с процентом прохождения
+        self.progress_table.empty()
+        self.progress_table.append_from_list([
+            ['Пройденный маршрут:'],
+            [f'{progress_percentage:.2f}%']
+        ])
+
 class NavigatorServer(App):
     my_instance = None
 
@@ -581,6 +656,10 @@ class NavigatorServer(App):
             pass
         self.svg_maneuvers.update_maneuver(maneuver, distance)
 
+    def update_traj_progres(self, percentage):
+        while self.progress_widget is None:
+            pass
+        self.progress_widget.update_progress(percentage)
 
     def main(self):
         # robot drive settings
@@ -588,7 +667,6 @@ class NavigatorServer(App):
 
         # plot settings
         self.wid = gui.VBox(margin='0px auto')
-        self.bt = gui.Button('Press me!')
 
         self.svgplot = RobotPlot(600, 600)
         self.svgplot.style['margin'] = '10px'
@@ -597,9 +675,12 @@ class NavigatorServer(App):
         self.svgplot.append_poly([self.gt_driving, self.real_driving])
         self.wid.append(self.svgplot)
 
-        self.svg_maneuvers = ManeuverArrow(width=100, height=100)
+        self.svg_maneuvers = ManeuverSvg(width=100, height=100)
         self.svg_maneuvers.update_maneuver("shift_right_to_left", 100.1)
         self.wid.append(self.svg_maneuvers)
+
+        self.progress_widget = ProgressBar(width=200, height=5)
+        self.wid.append(self.progress_widget)
 
         self.stop_flag = False
         self.count = 0

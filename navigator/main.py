@@ -24,12 +24,14 @@ if __name__ == "__main__":
 
 
     gt = instance.get_gt_path("trajectories/2024_03_14_16_42_41.csv")
-    for pt in gt:
+    for step, pt in enumerate(gt):
         time.sleep(0.1)
         instance.update_road_visor_detections(road_visor_detection)
         distance_to_maneuver = random.uniform(50, 200)
         maneuver = random.choice(['left', 'right', 'straight', 'shift_right_to_left', 'shift_left_to_right'])
         instance.update_maneuver(maneuver, distance_to_maneuver)
+        instance.update_traj_progres(step / len(gt) * 100)
+        print(f"{step / len(gt)}%")
         x = pt[0]
         y = pt[1]
         instance.update_real_path(x, y)
