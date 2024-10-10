@@ -246,6 +246,173 @@ class RobotPlot(gui.Svg):
         direction_up = math.radians(270)
         self.draw_robot(centerX, centerY, direction_up)
 
+class ManeuverArrow(gui.VBox):
+    def __init__(self, width, height):
+        super(ManeuverArrow, self).__init__()
+        self.width = width
+        self.height = height
+        self.arrow_svg = gui.Svg(width=self.width, height=self.height)  # Создаём отдельный SVG для стрелки
+        self.distance_table = gui.Table(width='100%')  # Создаём таблицу для текста
+
+        # Настраиваем таблицу для текста
+        self.distance_table.append_from_list([['Оставшееся расстояние']], fill_title=True)
+        self.distance_table.set_style({
+            'font-size': '24px',  # Увеличиваем размер шрифта
+            'text-align': 'center',
+            'border': '2px solid black',
+            'margin-top': '10px',
+            'width': '100%',
+            'padding': '5px'
+        })
+
+        # Добавляем стрелку и таблицу в контейнер
+        self.append(self.arrow_svg)
+        self.append(self.distance_table)
+
+    def update_maneuver(self, maneuver_name, distance_to_maneuver):
+        # Очищаем SVG перед добавлением новой стрелки
+        self.arrow_svg.empty()
+
+        # Обновляем стрелку в зависимости от манёвра
+        if maneuver_name == 'left':
+            self.draw_left_arrow()
+        elif maneuver_name == 'right':
+            self.draw_right_arrow()
+        elif maneuver_name == 'straight':
+            self.draw_straight_arrow()
+
+        # Обновляем текст в таблице
+        self.distance_table.empty()
+        self.distance_table.append_from_list([
+            ['До манёвра:'],
+            [f'{distance_to_maneuver} м']
+        ])
+
+    def draw_left_arrow(self):
+        # Окружение знака (рамка)
+        sign = gui.SvgGroup()
+        background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
+        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_stroke(2, 'black')  # Чёрная рамка
+        sign.append(background)
+
+        # Стрелка налево
+        arrow = gui.SvgPolyline()
+        up_line = gui.SvgPolyline()
+        mid_x = self.width / 2
+        mid_y = self.height / 2
+        size = min(self.width, self.height) / 2 - 20
+
+        points_arrow = [
+            (mid_x + size / 2, mid_y - size / 2),
+            (mid_x - size / 2, mid_y),
+            (mid_x + size / 2, mid_y + size / 2)
+        ]
+        points_up = [
+            (mid_x - size / 2, mid_y),
+            (mid_x + size, mid_y),
+            (mid_x + size, mid_y + size)
+        ]
+
+        for point in points_arrow:
+            arrow.add_coord(point[0], point[1])
+
+        for point in points_up:
+            up_line.add_coord(point[0], point[1])
+
+        arrow.set_stroke(8, 'black')
+        arrow.set_fill('none')
+        up_line.set_stroke(8, 'black')
+        up_line.set_fill('none')
+        sign.append(arrow)
+        sign.append(up_line)
+
+        # Добавляем стрелку в SVG
+        self.arrow_svg.append(sign)
+
+    def draw_right_arrow(self):
+        # Окружение знака (рамка)
+        sign = gui.SvgGroup()
+        background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
+        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_stroke(2, 'black')  # Чёрная рамка
+        sign.append(background)
+
+        # Стрелка направо
+        arrow = gui.SvgPolyline()
+        up_line = gui.SvgPolyline()
+        mid_x = self.width / 2
+        mid_y = self.height / 2
+        size = min(self.width, self.height) / 2 - 20
+
+        points_arrow = [
+            (mid_x - size / 2, mid_y - size / 2),
+            (mid_x + size / 2, mid_y),
+            (mid_x - size / 2, mid_y + size / 2)
+        ]
+        points_up = [
+            (mid_x + size / 2, mid_y),
+            (mid_x - size, mid_y),
+            (mid_x - size, mid_y + size)
+        ]
+
+        for point in points_arrow:
+            arrow.add_coord(point[0], point[1])
+
+        for point in points_up:
+            up_line.add_coord(point[0], point[1])
+
+        arrow.set_stroke(8, 'black')
+        arrow.set_fill('none')
+        up_line.set_stroke(8, 'black')
+        up_line.set_fill('none')
+        sign.append(arrow)
+        sign.append(up_line)
+
+        # Добавляем стрелку в SVG
+        self.arrow_svg.append(sign)
+
+    def draw_straight_arrow(self):
+        # Окружение знака (рамка)
+        sign = gui.SvgGroup()
+        background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
+        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_stroke(2, 'black')  # Чёрная рамка
+        sign.append(background)
+
+        # Прямая стрелка вверх
+        arrow = gui.SvgPolyline()
+        up_line = gui.SvgPolyline()
+        mid_x = self.width / 2
+        mid_y = self.height / 2
+        size = min(self.width, self.height) / 2 - 20
+
+        points_arrow = [
+            (mid_x - size / 2, mid_y),
+            (mid_x, mid_y - size / 2),
+            (mid_x + size / 2, mid_y)
+        ]
+        points_up = [
+            (mid_x, mid_y + size),
+            (mid_x, mid_y - size / 2)
+        ]
+
+        for point in points_arrow:
+            arrow.add_coord(point[0], point[1])
+
+        for point in points_up:
+            up_line.add_coord(point[0], point[1])
+
+        arrow.set_stroke(8, 'black')
+        arrow.set_fill('none')
+        up_line.set_stroke(8, 'black')
+        up_line.set_fill('none')
+        sign.append(arrow)
+        sign.append(up_line)
+
+        # Добавляем стрелку в SVG
+        self.arrow_svg.append(sign)
+
 
 class NavigatorServer(App):
     my_instance = None
@@ -304,12 +471,18 @@ class NavigatorServer(App):
 
         # plot settings
         self.wid = gui.VBox(margin='0px auto')
+        self.bt = gui.Button('Press me!')
+
         self.svgplot = RobotPlot(600, 600)
         self.svgplot.style['margin'] = '10px'
         self.real_driving = SvgComposedPoly(self.draw_only_n, 0.3, 'rgba(0,0,255,0.8)')
         self.gt_driving = SvgComposedPoly(9999999, 0.3, 'rgba(0,200,0,1.9)')
         self.svgplot.append_poly([self.gt_driving, self.real_driving])
         self.wid.append(self.svgplot)
+
+        self.svg_maneuvers = ManeuverArrow(width=100, height=100)
+        self.svg_maneuvers.update_maneuver("straight", 100.1)
+        self.wid.append(self.svg_maneuvers)
 
         self.stop_flag = False
         self.count = 0
