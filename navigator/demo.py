@@ -280,6 +280,10 @@ class ManeuverArrow(gui.VBox):
             self.draw_right_arrow()
         elif maneuver_name == 'straight':
             self.draw_straight_arrow()
+        elif maneuver_name == 'shift_left_to_right':
+            self.draw_shift_left_to_right()
+        elif maneuver_name == 'shift_right_to_left':
+            self.draw_shift_right_to_left()
 
         # Обновляем текст в таблице
         self.distance_table.empty()
@@ -288,6 +292,7 @@ class ManeuverArrow(gui.VBox):
             [f'{distance_to_maneuver} м']
         ])
 
+    # Пример манёвра налево
     def draw_left_arrow(self):
         # Окружение знака (рамка)
         sign = gui.SvgGroup()
@@ -330,46 +335,154 @@ class ManeuverArrow(gui.VBox):
         # Добавляем стрелку в SVG
         self.arrow_svg.append(sign)
 
-    def draw_right_arrow(self):
-        # Окружение знака (рамка)
+    # Манёвр: смещение по кромке слева направо
+    def draw_shift_left_to_right(self):
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
         background.set_fill('#D3D3D3')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
-        # Стрелка направо
-        arrow = gui.SvgPolyline()
-        up_line = gui.SvgPolyline()
+        # Две вертикальные линии
+        left_line = gui.SvgPolyline()
+        right_line = gui.SvgPolyline()
+        snake = gui.SvgPolyline()
+
         mid_x = self.width / 2
         mid_y = self.height / 2
         size = min(self.width, self.height) / 2 - 20
 
+        # Координаты для вертикальных линий
+        points_left_line = [
+            (mid_x - size, 10),
+            (mid_x - size, self.height - 10)
+        ]
+        points_right_line = [
+            (mid_x + size, 10),
+            (mid_x + size, self.height - 10)
+        ]
+
+        # Змейка: слева направо
+        points_snake = [
+            (mid_x - size + 10, self.height - 10),  # Старт на нижней левой линии
+            (mid_x - size + 10, mid_y + size / 2),  # Вверх до середины
+            (mid_x - size + 40, mid_y + size / 2),  # Переход немного вправо
+            (mid_x - size + 40, mid_y - size),  # Вверх
+        ]
+
+        # Маленькая стрелка
+        arrow = gui.SvgPolyline()
         points_arrow = [
-            (mid_x - size / 2, mid_y - size / 2),
-            (mid_x + size / 2, mid_y),
-            (mid_x - size / 2, mid_y + size / 2)
+            (mid_x - size / 2 + 10, mid_y - size / 2),
+            (mid_x + 10, mid_y - size / 2 - size / 2),
+            (mid_x + size / 2 + 10, mid_y - size / 2)
         ]
-        points_up = [
-            (mid_x + size / 2, mid_y),
-            (mid_x - size, mid_y),
-            (mid_x - size, mid_y + size)
-        ]
+
+        # Добавляем координаты для линий и змейки
+        for point in points_left_line:
+            left_line.add_coord(point[0], point[1])
+
+        for point in points_right_line:
+            right_line.add_coord(point[0], point[1])
+
+        for point in points_snake:
+            snake.add_coord(point[0], point[1])
 
         for point in points_arrow:
             arrow.add_coord(point[0], point[1])
 
-        for point in points_up:
-            up_line.add_coord(point[0], point[1])
-
+        # Настройка линий
+        left_line.set_stroke(8, 'black')
+        left_line.set_fill('none')
+        right_line.set_stroke(8, 'black')
+        right_line.set_fill('none')
+        snake.set_stroke(8, 'black')
+        snake.set_fill('none')
         arrow.set_stroke(8, 'black')
         arrow.set_fill('none')
-        up_line.set_stroke(8, 'black')
-        up_line.set_fill('none')
-        sign.append(arrow)
-        sign.append(up_line)
 
-        # Добавляем стрелку в SVG
+        # Добавляем линии, змейку и стрелку
+        sign.append(left_line)
+        sign.append(right_line)
+        sign.append(snake)
+        sign.append(arrow)
+
+        # Добавляем знак в SVG
+        self.arrow_svg.append(sign)
+
+    # Манёвр: смещение по кромке справа налево
+    def draw_shift_right_to_left(self):
+        sign = gui.SvgGroup()
+        background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
+        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_stroke(2, 'black')  # Чёрная рамка
+        sign.append(background)
+
+        # Две вертикальные линии
+        left_line = gui.SvgPolyline()
+        right_line = gui.SvgPolyline()
+        snake = gui.SvgPolyline()
+
+        mid_x = self.width / 2
+        mid_y = self.height / 2
+        size = min(self.width, self.height) / 2 - 20
+
+        # Координаты для вертикальных линий
+        points_left_line = [
+            (mid_x - size, 10),
+            (mid_x - size, self.height - 10)
+        ]
+        points_right_line = [
+            (mid_x + size, 10),
+            (mid_x + size, self.height - 10)
+        ]
+
+        # Змейка: справа налево
+        points_snake = [
+            (mid_x + size - 10, self.height - 10),  # Старт на нижней правой линии
+            (mid_x + size - 10, mid_y + size / 2),  # Вверх до середины
+            (mid_x + size - 40, mid_y + size / 2),  # Переход немного влево
+            (mid_x + size - 40, mid_y - size),  # Вверх
+        ]
+
+        # Маленькая стрелка
+        arrow = gui.SvgPolyline()
+        points_arrow = [
+            (mid_x + size / 2 - 10, mid_y - size / 2),
+            (mid_x - 10, mid_y - size / 2 - size / 2),
+            (mid_x - size / 2 - 10, mid_y - size / 2)
+        ]
+
+        # Добавляем координаты для линий и змейки
+        for point in points_left_line:
+            left_line.add_coord(point[0], point[1])
+
+        for point in points_right_line:
+            right_line.add_coord(point[0], point[1])
+
+        for point in points_snake:
+            snake.add_coord(point[0], point[1])
+
+        for point in points_arrow:
+            arrow.add_coord(point[0], point[1])
+
+        # Настройка линий
+        left_line.set_stroke(8, 'black')
+        left_line.set_fill('none')
+        right_line.set_stroke(8, 'black')
+        right_line.set_fill('none')
+        snake.set_stroke(8, 'black')
+        snake.set_fill('none')
+        arrow.set_stroke(8, 'black')
+        arrow.set_fill('none')
+
+        # Добавляем линии, змейку и стрелку
+        sign.append(left_line)
+        sign.append(right_line)
+        sign.append(snake)
+        sign.append(arrow)
+
+        # Добавляем знак в SVG
         self.arrow_svg.append(sign)
 
     def draw_straight_arrow(self):
@@ -412,7 +525,6 @@ class ManeuverArrow(gui.VBox):
 
         # Добавляем стрелку в SVG
         self.arrow_svg.append(sign)
-
 
 class NavigatorServer(App):
     my_instance = None
@@ -464,6 +576,11 @@ class NavigatorServer(App):
             pass
         self.svgplot.update_road_visor_detections(detections)
 
+    def update_maneuver(self, maneuver, distance):
+        while self.svg_maneuvers is None:
+            pass
+        self.svg_maneuvers.update_maneuver(maneuver, distance)
+
 
     def main(self):
         # robot drive settings
@@ -481,7 +598,7 @@ class NavigatorServer(App):
         self.wid.append(self.svgplot)
 
         self.svg_maneuvers = ManeuverArrow(width=100, height=100)
-        self.svg_maneuvers.update_maneuver("straight", 100.1)
+        self.svg_maneuvers.update_maneuver("shift_right_to_left", 100.1)
         self.wid.append(self.svg_maneuvers)
 
         self.stop_flag = False
