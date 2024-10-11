@@ -617,7 +617,7 @@ class ProgressBar(gui.HBox):
         # Обновляем текст с процентом прохождения
         self.progress_table.empty()
         self.progress_table.append_from_list([
-            [f'Пройдено: {progress_percentage:.2f}%']
+            [f'{progress_percentage:.2f}%']
         ])
 
 
