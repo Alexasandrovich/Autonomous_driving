@@ -82,7 +82,7 @@ class RobotPlot(gui.Svg):
         self.remove_child(poly.textXMax)
         self.remove_child(poly.textYVal)
 
-    def draw_robot(self, x, y, direction):
+    def draw_robot(self, x, y, direction=math.radians(270)):
         if self.robot_element is not None:
             self.remove_child(self.robot_element)
         if self.robot_dir_element is not None:
@@ -150,7 +150,6 @@ class RobotPlot(gui.Svg):
         for person in people_positions:
             # Convert person's coordinates relative to robot's frame of reference
             person_x, person_y = self.convert_coordinates((person[0], person[1]), centerX, centerY)
-            person_y = self.height - person_y
 
             # Draw each person as a blue circle
             person_circle = gui.SvgCircle(person_x, person_y, self.scale_x / 3)
@@ -187,8 +186,8 @@ class RobotPlot(gui.Svg):
                 x1, y1 = self.convert_coordinates(point1, centerX, centerY)
                 x2, y2 = self.convert_coordinates(point2, centerX, centerY)
 
-                y1 = self.height - y1
-                y2 = self.height - y2
+                # y1 = centerY + y1
+                # y2 = centerY + y2
 
                 line = gui.SvgPolyline()
                 line.add_coord(x1, y1)
@@ -227,10 +226,25 @@ class RobotPlot(gui.Svg):
         if need_make_trasform is not None:
             self.polyList[0].attributes['transform'] = need_make_trasform
 
-    def convert_coordinates(self, point, translateX, translateY):
-        """Converts 2D for SVG display and applies translation."""
-        x, y = point[0] * self.scale_x + translateX, point[1] * self.scale_y + translateY
-        return x, y
+    def convert_coordinates(self, point, translateX, translateY, direction=math.radians(180)):
+        """Converts 2D for SVG display and applies translation, scaling, and rotation."""
+        x, y = point[0], point[1]
+
+        # Применяем масштабирование
+        x *= self.scale_x
+        y *= self.scale_y
+
+        # Применяем отзеркаливание по оси X для учета направления оси координат в SVG (оси X направлены вправо)
+        x = -x
+
+        # Применяем поворот относительно направления робота
+        x_rotated = x * math.cos(direction) - y * math.sin(direction)
+        y_rotated = x * math.sin(direction) + y * math.cos(direction)
+
+        # Применяем сдвиг относительно центра робота
+        x_final = x_rotated + translateX
+        y_final = y_rotated + translateY
+        return x_final, y_final
 
     def render(self):
         # choose ROI (region of interest)
@@ -247,8 +261,7 @@ class RobotPlot(gui.Svg):
         self.draw_road_visor_detections(centerX, centerY)
 
         # draw robot
-        direction_up = math.radians(270)
-        self.draw_robot(centerX, centerY, direction_up)
+        self.draw_robot(centerX, centerY)
 
         # draw obstacles
         self.draw_people(self.people_detections, centerX, centerY)
