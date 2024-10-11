@@ -417,7 +417,7 @@ class ManeuverSvg(gui.HBox):
             (mid_x - size + 10, self.height - 10),  # Старт на нижней левой линии
             (mid_x - size + 10, mid_y + size / 2),  # Вверх до середины
             (mid_x - size + 40, mid_y + size / 2),  # Переход немного вправо
-            (mid_x - size + 40, mid_y de- size),  # Вверх
+            (mid_x - size + 40, mid_y - size),  # Вверх
         ]
 
         # Маленькая стрелка
