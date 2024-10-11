@@ -33,6 +33,7 @@ if __name__ == "__main__":
         instance.update_traj_progres(step / len(gt) * 100)
         people_detections = [(1.2, 10), ]  # Координаты людей
         instance.update_people_detections(people_detections)
+        instance.update_metrics(0.95, True, 0.95)
         print(f"{step / len(gt)}%")
         x = pt[0]
         y = pt[1]

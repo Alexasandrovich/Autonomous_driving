@@ -706,6 +706,7 @@ class NavigatorServer(App):
         self.real_driving = None
         self.gt_driving = None
         self.svgplot = None
+        self.metrics_grid = None
 
         # main methods applying
         super(NavigatorServer, self).__init__(*args)
@@ -764,6 +765,11 @@ class NavigatorServer(App):
             pass
         self.svgplot.update_people_detections(people_positions)
 
+    def update_metrics(self, lk_value, is_road_value, rk_value):
+        while self.metrics_grid is None:
+            pass
+        self.metrics_grid.update_metrics(lk_value, is_road_value, rk_value)
+
     def main(self):
         # Основной контейнер
         self.wid = gui.VBox(margin='0px auto')
@@ -787,7 +793,7 @@ class NavigatorServer(App):
 
         # Добавляем таблицу метрик
         self.metrics_grid = MetricsGrid(width=250, height=50)
-        self.metrics_grid.update_metrics(0.95, True, 0.99)
+        self.metrics_grid.update_metrics(0.0, False, 0.0)
         self.metrics_grid.set_style({
             'margin': '10px auto',  # Центрирование по горизонтали
         })
