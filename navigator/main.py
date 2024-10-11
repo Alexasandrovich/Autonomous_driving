@@ -31,6 +31,8 @@ if __name__ == "__main__":
         maneuver = random.choice(['left', 'right', 'straight', 'shift_right_to_left', 'shift_left_to_right'])
         instance.update_maneuver(maneuver, distance_to_maneuver)
         instance.update_traj_progres(step / len(gt) * 100)
+        people_detections = [(1.2, 10), ]  # Координаты людей
+        instance.update_people_detections(people_detections)
         print(f"{step / len(gt)}%")
         x = pt[0]
         y = pt[1]

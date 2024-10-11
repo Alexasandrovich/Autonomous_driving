@@ -9,10 +9,6 @@ import math
 import uuid
 
 random.seed(228)
-from profiler import Profiler
-
-my_profiler = Profiler()
-my_profiler.set_output_file("profiler.txt")
 
 class SvgComposedPoly(gui.SvgGroup):
     """
@@ -59,12 +55,16 @@ class RobotPlot(gui.Svg):
         self.plot_inner_border = self.font_size
         self.scale_x = 10.0
         self.scale_y = 10.0
+        self.robot_down_shift = 250
         self.robot_element = None
         self.wheel_status = [False, False, False, False]
         self.wheels = None
         self.robot_dir_element = None
         self.road_visor_detections = None
         self.road_visor_detections_svg = None
+        self.people_detections = None
+        self.people_svg = None
+        self.critical_zone_svg = None
 
     def scale(self, x_scale, y_scale):
         self.scale_x *= x_scale
@@ -82,7 +82,6 @@ class RobotPlot(gui.Svg):
         self.remove_child(poly.textXMax)
         self.remove_child(poly.textYVal)
 
-    @my_profiler.profile
     def draw_robot(self, x, y, direction):
         if self.robot_element is not None:
             self.remove_child(self.robot_element)
@@ -118,11 +117,53 @@ class RobotPlot(gui.Svg):
         for i, offset in enumerate(wheel_offsets):
             wheel_x = x + offset[0] - wheel_radius / 2
             wheel_y = y + offset[1] - wheel_radius / 2
-            wheel_color = 'green' if self.wheel_status[i] else 'red'
+            wheel_color = 'green' if self.wheel_status[i] else 'orange'
             wheel = gui.SvgRectangle(wheel_x, wheel_y, wheel_radius, wheel_radius)
             wheel.set_fill(wheel_color)
             self.append(wheel)
             self.wheels.append(wheel)
+
+        # Draw critical area in front of the robot
+        # self.draw_critical_zone(x, y)
+
+    def draw_critical_zone(self, x, y):
+        """Draws a red rectangle indicating the critical zone in front of the robot."""
+        if self.critical_zone_svg is not None:
+            self.remove_child(self.critical_zone_svg)
+
+        self.critical_zone_svg = gui.SvgRectangle(x - 1.5 * self.scale_x, y - 3 * self.scale_y,
+                                                  3 * self.scale_x, 3 * self.scale_y)
+        self.critical_zone_svg.set_fill('none')
+        self.critical_zone_svg.set_stroke(2, 'red')
+        self.append(self.critical_zone_svg)
+
+    def draw_people(self, people_positions, centerX, centerY):
+        """Draws detected people as circles relative to the robot."""
+        if self.people_svg is not None:
+            self.remove_child(self.people_svg)
+
+        if people_positions is None:
+            return
+
+        self.people_svg = gui.SvgGroup()
+
+        for person in people_positions:
+            # Convert person's coordinates relative to robot's frame of reference
+            person_x, person_y = self.convert_coordinates((person[0], person[1]), centerX, centerY)
+            person_y = self.height - person_y
+
+            # Draw each person as a blue circle
+            person_circle = gui.SvgCircle(person_x, person_y, self.scale_x / 3)
+            person_circle.set_fill('red')
+            self.people_svg.append(person_circle)
+
+        self.append(self.people_svg)
+
+    def update_people_detections(self, people_positions):
+        """Updates the positions of detected people and redraws them."""
+        if self.people_svg is not None:
+            return
+        self.people_detections = people_positions
 
     def update_road_visor_detections(self, detections):
         if detections is None:
@@ -157,87 +198,50 @@ class RobotPlot(gui.Svg):
                 self.road_visor_detections_svg.append(line)
                 self.append(line)
 
+    def draw_path(self, centerX, centerY):
+        need_make_trasform = None
+        if len(self.polyList) > 1 and len(self.polyList[1].plotData.coordsX) > 0:
+            poly = self.polyList[1]
+            pointX = (poly.plotData.coordsX[-1]) * self.scale_x
+            pointY = (poly.plotData.coordsY[-1]) * self.scale_y
+
+            # Calculate the required displacement to center the last point
+            translateX = centerX - pointX
+            translateY = centerY + pointY
+
+            if len(poly.plotData.coordsX) < 2:
+                yaw = -90  # straight ahead
+            else:
+                diffX = poly.plotData.coordsX[-1] - poly.plotData.coordsX[-2]
+                diffY = poly.plotData.coordsY[-1] - poly.plotData.coordsY[-2]
+                # Calculate the angle in radians and convert it to degrees
+                diff = math.degrees(math.atan2(diffY, diffX))
+                yaw = -90 + diff  # so that the robot always looks forward
+
+            # Apply the offset to all elements of the graph, including the polygon
+            need_make_trasform = 'rotate({}, {}, {}) translate({},{}) scale({}, {})'.format(
+                yaw, centerX, centerY, translateX, translateY, self.scale_x, -1 * self.scale_y)
+            poly.attributes['transform'] = need_make_trasform
+
+        # draw GT path
+        if need_make_trasform is not None:
+            self.polyList[0].attributes['transform'] = need_make_trasform
+
     def convert_coordinates(self, point, translateX, translateY):
-        """Converts 3D coordinates to 2D for SVG display and applies translation."""
+        """Converts 2D for SVG display and applies translation."""
         x, y = point[0] * self.scale_x + translateX, point[1] * self.scale_y + translateY
         return x, y
 
-    @my_profiler.profile
     def render(self):
         # choose ROI (region of interest)
         self.set_viewbox(-self.plot_inner_border, -self.plot_inner_border, self.width + self.plot_inner_border * 2,
                          self.height + self.plot_inner_border * 2)
 
         centerX = self.width / 2.0
-        centerY = self.height / 2.0
+        centerY = self.height / 2.0 + self.robot_down_shift
 
         # draw real path
-        need_make_trasform = None
-        if len(self.polyList) > 1 and len(self.polyList[1].plotData.coordsX) > 0:
-            poly = self.polyList[1]
-            pointX = (poly.plotData.coordsX[-1]) * self.scale_x
-            pointY = (poly.plotData.coordsY[-1]) * self.scale_y
-
-            # Calculate the required displacement to center the last point
-            translateX = centerX - pointX
-            translateY = centerY + pointY
-
-            if len(poly.plotData.coordsX) < 2:
-                yaw = -90  # straight ahead
-            else:
-                diffX = poly.plotData.coordsX[-1] - poly.plotData.coordsX[-2]
-                diffY = poly.plotData.coordsY[-1] - poly.plotData.coordsY[-2]
-                # Calculate the angle in radians and convert it to degrees
-                diff = math.degrees(math.atan2(diffY, diffX))
-                yaw = -90 + diff  # so that the robot always looks forward
-
-            # Apply the offset to all elements of the graph, including the polygon
-            need_make_trasform = 'rotate({}, {}, {}) translate({},{}) scale({}, {})'.format(
-                yaw, centerX, centerY, translateX, translateY, self.scale_x, -1 * self.scale_y)
-            poly.attributes['transform'] = need_make_trasform
-
-        # draw GT path
-        if need_make_trasform is not None:
-            self.polyList[0].attributes['transform'] = need_make_trasform
-
-        # draw detections
-        self.draw_road_visor_detections(centerX, centerY)
-        # choose ROI (region of interest)
-        self.set_viewbox(-self.plot_inner_border, -self.plot_inner_border, self.width + self.plot_inner_border * 2,
-                         self.height + self.plot_inner_border * 2)
-
-        centerX = self.width / 2.0
-        centerY = self.height / 2.0
-
-        # draw real path
-        need_make_trasform = None
-        if len(self.polyList) > 1 and len(self.polyList[1].plotData.coordsX) > 0:
-            poly = self.polyList[1]
-            pointX = (poly.plotData.coordsX[-1]) * self.scale_x
-            pointY = (poly.plotData.coordsY[-1]) * self.scale_y
-
-            # Calculate the required displacement to center the last point
-            translateX = centerX - pointX
-            translateY = centerY + pointY
-
-            if len(poly.plotData.coordsX) < 2:
-                yaw = -90  # straight ahead
-            else:
-                diffX = poly.plotData.coordsX[-1] - poly.plotData.coordsX[-2]
-                diffY = poly.plotData.coordsY[-1] - poly.plotData.coordsY[-2]
-                # Calculate the angle in radians and convert it to degrees
-                diff = math.degrees(math.atan2(diffY, diffX))
-                yaw = -90 + diff  # so that the robot always looks forward
-
-            # Apply the offset to all elements of the graph, including the polygon
-            need_make_trasform = 'rotate({}, {}, {}) translate({},{}) scale({}, {})'.format(
-                yaw, centerX, centerY, translateX, translateY, self.scale_x, -1 * self.scale_y)
-            poly.attributes['transform'] = need_make_trasform
-
-
-        # draw GT path
-        if need_make_trasform is not None:
-            self.polyList[0].attributes['transform'] = need_make_trasform
+        self.draw_path(centerX, centerY)
 
         # draw detections
         self.draw_road_visor_detections(centerX, centerY)
@@ -246,13 +250,16 @@ class RobotPlot(gui.Svg):
         direction_up = math.radians(270)
         self.draw_robot(centerX, centerY, direction_up)
 
-class ManeuverSvg(gui.VBox):
+        # draw obstacles
+        self.draw_people(self.people_detections, centerX, centerY)
+
+class ManeuverSvg(gui.HBox):
     def __init__(self, width, height):
         super(ManeuverSvg, self).__init__()
         self.width = width
         self.height = height
-        self.arrow_svg = gui.Svg(width=self.width, height=self.height)  # Создаём отдельный SVG для стрелки
-        self.distance_table = gui.Table(width='100%')  # Создаём таблицу для текста
+        self.arrow_svg = gui.Svg(width=self.width + 45, height=self.height)  # Создаём отдельный SVG для стрелки
+        self.distance_table = gui.Table(width=self.width, height=self.height / 1.4)  # Создаём таблицу для текста
 
         # Настраиваем таблицу для текста
         self.distance_table.append_from_list([['Оставшееся расстояние']], fill_title=True)
@@ -262,8 +269,10 @@ class ManeuverSvg(gui.VBox):
             'border': '2px solid black',
             'margin-top': '10px',
             'width': '100%',
-            'padding': '5px'
+            'padding': '10px',
+            'background-color': '#FFFFFF',
         })
+        self.set_style({'margin': '0px'})
 
         # Добавляем стрелку и таблицу в контейнер
         self.append(self.arrow_svg)
@@ -288,7 +297,6 @@ class ManeuverSvg(gui.VBox):
         # Обновляем текст в таблице
         self.distance_table.empty()
         self.distance_table.append_from_list([
-            ['До манёвра:'],
             [f'{distance_to_maneuver:.2f} м']
         ])
 
@@ -297,7 +305,7 @@ class ManeuverSvg(gui.VBox):
         # Окружение знака (рамка)
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
-        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_fill('#FFFFFF')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
@@ -339,7 +347,7 @@ class ManeuverSvg(gui.VBox):
         # Окружение знака (рамка)
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
-        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_fill('#FFFFFF')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
@@ -381,7 +389,7 @@ class ManeuverSvg(gui.VBox):
     def draw_shift_left_to_right(self):
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
-        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_fill('#FFFFFF')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
@@ -409,7 +417,7 @@ class ManeuverSvg(gui.VBox):
             (mid_x - size + 10, self.height - 10),  # Старт на нижней левой линии
             (mid_x - size + 10, mid_y + size / 2),  # Вверх до середины
             (mid_x - size + 40, mid_y + size / 2),  # Переход немного вправо
-            (mid_x - size + 40, mid_y - size),  # Вверх
+            (mid_x - size + 40, mid_y de- size),  # Вверх
         ]
 
         # Маленькая стрелка
@@ -456,7 +464,7 @@ class ManeuverSvg(gui.VBox):
     def draw_shift_right_to_left(self):
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
-        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_fill('#FFFFFF')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
@@ -531,7 +539,7 @@ class ManeuverSvg(gui.VBox):
         # Окружение знака (рамка)
         sign = gui.SvgGroup()
         background = gui.SvgRectangle(10, 10, self.width - 20, self.height - 20)
-        background.set_fill('#D3D3D3')  # Светло-серый фон
+        background.set_fill('#FFFFFF')  # Светло-серый фон
         background.set_stroke(2, 'black')  # Чёрная рамка
         sign.append(background)
 
@@ -568,14 +576,13 @@ class ManeuverSvg(gui.VBox):
         # Добавляем стрелку в SVG
         self.arrow_svg.append(sign)
 
-class ProgressBar(gui.VBox):
+class ProgressBar(gui.HBox):
     def __init__(self, width, height):
         super(ProgressBar, self).__init__()
         self.width = width
         self.height = height
 
         # Создаём рамку для отображения процента
-        self.progress_svg = gui.Svg(width=self.width, height=self.height)
         self.progress_table = gui.Table(width='100%')
 
         # Настраиваем таблицу для отображения текста
@@ -583,23 +590,100 @@ class ProgressBar(gui.VBox):
         self.progress_table.set_style({
             'font-size': '24px',
             'text-align': 'center',
-            'border': '2px solid black',
-            'margin-top': '10px',
-            'width': '100%',
-            'padding': '5px'
+            'border': '2px solid black',  # Чёрная рамка
+            'padding': '5px',
+            'margin': '-9px',
+            'color': 'black',  # Чёрный цвет текста
+            'background-color': '#D3D3D3',  # Светло-серый фон
         })
 
-        # Добавляем SVG и таблицу в контейнер
-        self.append(self.progress_svg)
+        # Добавляем таблицу в контейнер
         self.append(self.progress_table)
 
     def update_progress(self, progress_percentage):
         # Обновляем текст с процентом прохождения
         self.progress_table.empty()
         self.progress_table.append_from_list([
-            ['Пройденный маршрут:'],
-            [f'{progress_percentage:.2f}%']
+            [f'Пройдено: {progress_percentage:.2f}%']
         ])
+
+
+class MetricsGrid(gui.GridBox):
+    def __init__(self, width, height):
+        super(MetricsGrid, self).__init__(width=width, height=height)
+
+        # Определяем ASCII-схему сетки для трех колонок и двух строк
+        self.set_from_asciiart("""
+            | LK     | IS_ROAD  | RK     |
+            | lk_val | is_road  | rk_val |
+        """, 10, 10)
+
+        # Добавляем стили для текста и рамок
+        cell_style = {
+            'text-align': 'center',
+            'font-weight': 'bold',
+            'border': '1px solid black',
+            'padding': '5px',
+        }
+
+        # Создаем виджеты для заголовков и значений
+        self.lk_label = gui.Label('LK', style=cell_style)
+        self.is_road_label = gui.Label('IS_ROAD', style=cell_style)
+        self.rk_label = gui.Label('RK', style=cell_style)
+
+        self.lk_value_label = gui.Label('0.00', style=cell_style)
+        self.is_road_value_label = gui.Label('False', style=cell_style)
+        self.rk_value_label = gui.Label('0.00', style=cell_style)
+
+        # Добавляем виджеты в контейнер
+        self.append({
+            'LK': self.lk_label,
+            'IS_ROAD': self.is_road_label,
+            'RK': self.rk_label,
+            'lk_val': self.lk_value_label,
+            'is_road': self.is_road_value_label,
+            'rk_val': self.rk_value_label,
+        })
+
+    # Функция для обновления метрик
+    def update_metrics(self, lk_value, is_road_value, rk_value):
+        self.lk_value_label.set_text(f'{lk_value:.2f}')
+        self.is_road_value_label.set_text(str(is_road_value))
+        self.rk_value_label.set_text(f'{rk_value:.2f}')
+
+
+class ZoomControl(gui.HBox):
+    def __init__(self, zoom_in_callback, zoom_out_callback):
+        super(ZoomControl, self).__init__(margin='0px')
+
+        # Кнопка увеличения
+        self.bt_zoom_in = gui.Button("+", width=100, height=50)
+        self.bt_zoom_in.set_style({
+            'font-size': '30px',
+            'margin': '0px',
+            'color': 'black',
+            'background-color': '#FFFFFF',
+            'border': '2px solid black'
+        })
+
+        # Кнопка уменьшения
+        self.bt_zoom_out = gui.Button("-", width=100, height=50)
+        self.bt_zoom_out.set_style({
+            'font-size': '30px',
+            'margin': '0px',
+            'color': 'black',
+            'background-color': '#FFFFFF',
+            'border': '2px solid black'
+        })
+
+        # Привязка событий к кнопкам
+        self.bt_zoom_in.onclick.do(zoom_in_callback)
+        self.bt_zoom_out.onclick.do(zoom_out_callback)
+
+        # Добавляем кнопки в контейнер
+        self.append(self.bt_zoom_out)
+        self.append(self.bt_zoom_in)
+
 
 class NavigatorServer(App):
     my_instance = None
@@ -661,40 +745,50 @@ class NavigatorServer(App):
             pass
         self.progress_widget.update_progress(percentage)
 
-    def main(self):
-        # robot drive settings
-        self.draw_only_n = 100
+    def update_people_detections(self, people_positions):
+        """Updates the detection of people by calling RobotPlot's update method."""
+        while self.svgplot is None:
+            pass
+        self.svgplot.update_people_detections(people_positions)
 
-        # plot settings
+    def main(self):
+        # Основной контейнер
         self.wid = gui.VBox(margin='0px auto')
 
+        # Добавляем график робота
         self.svgplot = RobotPlot(600, 600)
         self.svgplot.style['margin'] = '10px'
-        self.real_driving = SvgComposedPoly(self.draw_only_n, 0.3, 'rgba(0,0,255,0.8)')
+        self.real_driving = SvgComposedPoly(100, 0.3, 'rgba(0,0,255,0.8)')
         self.gt_driving = SvgComposedPoly(9999999, 0.3, 'rgba(0,200,0,1.9)')
         self.svgplot.append_poly([self.gt_driving, self.real_driving])
         self.wid.append(self.svgplot)
 
+        # Добавляем отображение манёвров
         self.svg_maneuvers = ManeuverSvg(width=100, height=100)
         self.svg_maneuvers.update_maneuver("shift_right_to_left", 100.1)
         self.wid.append(self.svg_maneuvers)
 
-        self.progress_widget = ProgressBar(width=200, height=5)
+        # Добавляем прогресс-бар
+        self.progress_widget = ProgressBar(width=200, height=1)
         self.wid.append(self.progress_widget)
+
+        # Добавляем таблицу метрик
+        self.metrics_grid = MetricsGrid(width=250, height=50)
+        self.metrics_grid.update_metrics(0.95, True, 0.99)
+        self.metrics_grid.set_style({
+            'margin': '10px auto',  # Центрирование по горизонтали
+        })
+        self.wid.append(self.metrics_grid)
+
+        # Добавляем управление зумом
+        self.zoom_control = ZoomControl(self.zoom_in, self.zoom_out)
+        self.wid.append(self.zoom_control)
 
         self.stop_flag = False
         self.count = 0
         self.start_draw()
 
-        # interface
-        bt_zoom_in = gui.Button("Zoom + ")
-        bt_zoom_out = gui.Button("Zoom - ")
-        bt_zoom_in.onclick.do(self.zoom_in)
-        bt_zoom_out.onclick.do(self.zoom_out)
-        self.wid.append(bt_zoom_in)
-        self.wid.append(bt_zoom_out)
-
-        # returning the root widget
+        # Устанавливаем готовность сервера
         NavigatorServer.ready = True
         return self.wid
 
